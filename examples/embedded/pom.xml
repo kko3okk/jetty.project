@@ -77,6 +77,16 @@
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-alpn-openjdk8-server</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-alpn-conscrypt-server</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-annotations</artifactId>
       <version>${project.version}</version>
     </dependency>
@@ -130,5 +140,28 @@
       <classifier>tests</classifier>
       <scope>test</scope>
     </dependency>
+
+
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-alpn-java-server</artifactId>
+      <version>${project.version}</version>
+    </dependency>
   </dependencies>
+
+  <profiles>
+    <profile>
+      <id>jdk9</id>
+      <activation>
+        <jdk>[1.9,)</jdk>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>jetty-alpn-java-server</artifactId>
+          <version>${project.version}</version>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
 </project>

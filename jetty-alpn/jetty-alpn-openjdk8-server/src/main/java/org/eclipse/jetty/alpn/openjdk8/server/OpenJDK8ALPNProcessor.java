@@ -16,34 +16,40 @@
 //  ========================================================================
 //
 
-package org.eclipse.jetty.alpn.java.server;
+package org.eclipse.jetty.alpn.openjdk8.server;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.function.BiFunction;
 
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLException;
 
+import org.eclipse.jetty.alpn.ALPN;
 import org.eclipse.jetty.alpn.server.ALPNServerConnection;
 import org.eclipse.jetty.io.Connection;
 import org.eclipse.jetty.io.ssl.ALPNProcessor;
-import org.eclipse.jetty.io.ssl.SslConnection;
-import org.eclipse.jetty.io.ssl.SslHandshakeListener;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 
-public class JDK9ServerALPNProcessor implements ALPNProcessor.Server, SslHandshakeListener
+public class OpenJDK8ALPNProcessor implements ALPNProcessor.Server
 {
-    private static final Logger LOG = Log.getLogger(JDK9ServerALPNProcessor.class);
-
+    private static final Logger LOG = Log.getLogger(OpenJDK8ALPNProcessor.class);
+    
     @Override
     public void init(boolean debug)
     {
         String javaVersion = System.getProperty("java.version");
-        if (javaVersion.startsWith("1."))
+        if (!javaVersion.startsWith("1."))
             throw new IllegalStateException(this + " not applicable for java "+javaVersion);
+
+        if (ALPN.class.getClassLoader()!=null)
+            throw new IllegalStateException(this + " must be on JVM boot classpath");
+        
         if (debug)
+        {
             LOG.setDebugEnabled(true);
+            ALPN.debug = true;
+        }
     }
 
     @Override
@@ -55,45 +61,50 @@ public class JDK9ServerALPNProcessor implements ALPNProcessor.Server, SslHandsha
     @Override
     public void configure(SSLEngine sslEngine, Connection connection)
     {
-        sslEngine.setHandshakeApplicationProtocolSelector(new ALPNCallback((ALPNServerConnection)connection));
+        connection.addListener(new ALPNListener((ALPNServerConnection)connection));
     }
 
-    private final class ALPNCallback implements BiFunction<SSLEngine,List<String>,String>, SslHandshakeListener
+    private final class ALPNListener implements ALPN.ServerProvider, Connection.Listener
     {
         private final ALPNServerConnection alpnConnection;
 
-        private ALPNCallback(ALPNServerConnection connection)
+        private ALPNListener(ALPNServerConnection connection)
         {
             alpnConnection = connection;
-            ((SslConnection.DecryptedEndPoint)alpnConnection.getEndPoint()).getSslConnection().addHandshakeListener(this);
         }
 
         @Override
-        public String apply(SSLEngine engine, List<String> protocols)
+        public void onOpened(Connection connection)
         {
             if (LOG.isDebugEnabled())
-                LOG.debug("apply {} {}", alpnConnection, protocols);
+                LOG.debug("onOpened {}", alpnConnection);
+            ALPN.put(alpnConnection.getSSLEngine(), this);
+        }
+
+        @Override
+        public void onClosed(Connection connection)
+        {
+            if (LOG.isDebugEnabled())
+                LOG.debug("onClosed {}", alpnConnection);
+            ALPN.remove(alpnConnection.getSSLEngine());
+        }
+        
+        @Override
+        public void unsupported()
+        {
+            if (LOG.isDebugEnabled())
+                LOG.debug("unsupported {}", alpnConnection);
+            alpnConnection.select(Collections.emptyList());
+        }
+
+        @Override
+        public String select(List<String> protocols) throws SSLException
+        {
+            if (LOG.isDebugEnabled())
+                LOG.debug("select {} {}", alpnConnection, protocols);
             alpnConnection.select(protocols);
             return alpnConnection.getProtocol();
         }
-
-        @Override
-        public void handshakeSucceeded(Event event)
-        {
-            if (alpnConnection.getProtocol()==null)
-            {
-                LOG.warn("No ALPN callback! {} {}",alpnConnection, event);
-                alpnConnection.select(Collections.emptyList());
-            }
-            if (LOG.isDebugEnabled())
-                LOG.debug("handshakeSucceeded {} {}", alpnConnection, event);
-        }
-
-        @Override
-        public void handshakeFailed(Event event, Throwable failure)
-        {
-            if (LOG.isDebugEnabled())
-                LOG.debug("handshakeFailed {} {} {}", alpnConnection, event, failure);
-        }
     }
+
 }

@@ -16,32 +16,38 @@
 //  ========================================================================
 //
 
-package org.eclipse.jetty.alpn.java.server;
+package org.eclipse.jetty.alpn.conscrypt.server;
 
+import java.lang.reflect.Method;
+import java.security.Security;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.BiFunction;
 
 import javax.net.ssl.SSLEngine;
 
+import org.conscrypt.OpenSSLProvider;
 import org.eclipse.jetty.alpn.server.ALPNServerConnection;
 import org.eclipse.jetty.io.Connection;
 import org.eclipse.jetty.io.ssl.ALPNProcessor;
-import org.eclipse.jetty.io.ssl.SslConnection;
 import org.eclipse.jetty.io.ssl.SslHandshakeListener;
+import org.eclipse.jetty.io.ssl.SslConnection.DecryptedEndPoint;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 
-public class JDK9ServerALPNProcessor implements ALPNProcessor.Server, SslHandshakeListener
+public class ConscryptALPNProcessor implements ALPNProcessor.Server
 {
-    private static final Logger LOG = Log.getLogger(JDK9ServerALPNProcessor.class);
+    private static final Logger LOG = Log.getLogger(ConscryptALPNProcessor.class);
 
     @Override
     public void init(boolean debug)
     {
-        String javaVersion = System.getProperty("java.version");
-        if (javaVersion.startsWith("1."))
-            throw new IllegalStateException(this + " not applicable for java "+javaVersion);
+        if (Security.getProvider("Conscrypt")==null)
+        {
+            LOG.debug("Security.addProvider(\"Conscrypt\")");
+            Security.addProvider(new OpenSSLProvider());
+        }
+        
         if (debug)
             LOG.setDebugEnabled(true);
     }
@@ -49,13 +55,23 @@ public class JDK9ServerALPNProcessor implements ALPNProcessor.Server, SslHandsha
     @Override
     public boolean appliesTo(SSLEngine sslEngine)
     {
-        return sslEngine.getClass().getName().startsWith("sun.security.ssl.");
+        return sslEngine.getClass().getName().startsWith("org.conscrypt.");
     }
 
     @Override
-    public void configure(SSLEngine sslEngine, Connection connection)
+    public void configure(SSLEngine sslEngine,Connection connection)
     {
-        sslEngine.setHandshakeApplicationProtocolSelector(new ALPNCallback((ALPNServerConnection)connection));
+        try
+        {
+            // For JDK9 this could call directly, but we need the addProvider in the check, so use same processor
+            Method method = sslEngine.getClass().getMethod("setHandshakeApplicationProtocolSelector",BiFunction.class);
+            method.setAccessible(true);
+            method.invoke(sslEngine,new ALPNCallback((ALPNServerConnection)connection));
+        }
+        catch(Throwable e)
+        {
+            throw new RuntimeException(e);
+        }
     }
 
     private final class ALPNCallback implements BiFunction<SSLEngine,List<String>,String>, SslHandshakeListener
@@ -64,8 +80,8 @@ public class JDK9ServerALPNProcessor implements ALPNProcessor.Server, SslHandsha
 
         private ALPNCallback(ALPNServerConnection connection)
         {
-            alpnConnection = connection;
-            ((SslConnection.DecryptedEndPoint)alpnConnection.getEndPoint()).getSslConnection().addHandshakeListener(this);
+            alpnConnection = connection;            
+            ((DecryptedEndPoint)alpnConnection.getEndPoint()).getSslConnection().addHandshakeListener(this);
         }
 
         @Override

@@ -7,21 +7,26 @@ Installs the Conscrypt JSSE provider
 [depend]
 ssl
 
-[files]
-maven://org.conscrypt/conscrypt-openjdk-uber/${conscrypt.version}|lib/conscrypt/conscrypt-uber-${conscrypt.version}.jar
-basehome:modules/conscrypt/conscrypt.xml|etc/conscrypt.xml
+[provides]
+alpn-impl
 
-[lib]
-lib/conscrypt/**.jar
+[files]
+#maven://org.conscrypt/conscrypt-openjdk-uber/${conscrypt.version}|lib/conscrypt/conscrypt-uber-${conscrypt.version}.jar
+maven://org.conscrypt/conscrypt-openjdk/${conscrypt.version}/jar/linux-x86_64|lib/conscrypt/conscrypt-${conscrypt.version}-linux-x86_64.jar
+basehome:modules/conscrypt/conscrypt.xml|etc/conscrypt.xml
 
 [xml]
 etc/conscrypt.xml
+
+[lib]
+lib/conscrypt/**.jar
+lib/jetty-alpn-conscrypt-server-${jetty.version}.jar
 
 [license]
 Conscrypt is distributed under the Apache Licence 2.0
 https://github.com/google/conscrypt/blob/master/LICENSE
 
 [ini]
-conscrypt.version?=1.0.0.RC9
-jetty.sslContext.provider?=AndroidOpenSSL
+conscrypt.version?=1.1.0-SNAPSHOT
+jetty.sslContext.provider?=Conscrypt
 

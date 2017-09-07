@@ -18,7 +18,8 @@
 
 package org.eclipse.jetty.alpn.server;
 
-import java.util.Iterator;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.ServiceLoader;
 
@@ -27,51 +28,82 @@ import javax.net.ssl.SSLEngine;
 import org.eclipse.jetty.io.AbstractConnection;
 import org.eclipse.jetty.io.EndPoint;
 import org.eclipse.jetty.io.ssl.ALPNProcessor;
-import org.eclipse.jetty.io.ssl.SslHandshakeListener;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.NegotiatingServerConnectionFactory;
+import org.eclipse.jetty.util.MultiException;
 import org.eclipse.jetty.util.annotation.Name;
+import org.eclipse.jetty.util.log.Log;
+import org.eclipse.jetty.util.log.Logger;
 
-public class ALPNServerConnectionFactory extends NegotiatingServerConnectionFactory implements SslHandshakeListener
+public class ALPNServerConnectionFactory extends NegotiatingServerConnectionFactory
 {
-    private final ALPNProcessor.Server alpnProcessor;
+    private static final Logger LOG = Log.getLogger(ALPNServerConnectionFactory.class);
+
+    private final List<ALPNProcessor.Server> processors = new ArrayList<>();
 
     public ALPNServerConnectionFactory(String protocols)
     {
         this(protocols.trim().split(",", 0));
     }
-
+    
     public ALPNServerConnectionFactory(@Name("protocols") String... protocols)
     {
-        super("alpn", protocols);
-        checkProtocolNegotiationAvailable();
-        Iterator<ALPNProcessor.Server> processors = ServiceLoader.load(ALPNProcessor.Server.class).iterator();
-        alpnProcessor = processors.hasNext() ? processors.next() : ALPNProcessor.Server.NOOP;
+        this(false,protocols);
     }
 
-    public ALPNProcessor.Server getALPNProcessor()
+    public ALPNServerConnectionFactory(@Name("debug") boolean debug, @Name("protocols") String... protocols)
     {
-        return alpnProcessor;
+        super("alpn", protocols);
+        MultiException me = new MultiException();
+        for (ALPNProcessor.Server processor: ServiceLoader.load(ALPNProcessor.Server.class))
+        {
+            try
+            {
+                processor.init(debug);
+                processors.add(processor);
+            }
+            catch(Throwable th)
+            {
+                LOG.debug("{} -> {}",processor,th);
+                me.add(th);
+            }
+        }
+        
+        if (LOG.isDebugEnabled())
+        {
+            LOG.debug("protocols: {}",Arrays.asList(protocols));
+            LOG.debug("processors: {}",processors);
+        }
+        if (processors.isEmpty())
+        {
+            IllegalStateException ise = new IllegalStateException("No Server ALPNProcessors!");
+            for (Throwable th : me.getThrowables())
+                ise.addSuppressed(th);
+            throw ise;
+        }
     }
 
     @Override
     protected AbstractConnection newServerConnection(Connector connector, EndPoint endPoint, SSLEngine engine, List<String> protocols, String defaultProtocol)
     {
-        getALPNProcessor().configure(engine);
-        return new ALPNServerConnection(connector, endPoint, engine, protocols, defaultProtocol);
-    }
-
-    @Override
-    public void handshakeSucceeded(Event event)
-    {
-        if (alpnProcessor instanceof SslHandshakeListener)
-            ((SslHandshakeListener)alpnProcessor).handshakeSucceeded(event);
-    }
-
-    @Override
-    public void handshakeFailed(Event event, Throwable failure)
-    {
-        if (alpnProcessor instanceof SslHandshakeListener)
-            ((SslHandshakeListener)alpnProcessor).handshakeFailed(event, failure);
+        ALPNServerConnection connection = new ALPNServerConnection(connector, endPoint, engine, protocols, defaultProtocol);
+        ALPNProcessor.Server processor = null;
+        for (ALPNProcessor.Server p: processors)
+        {
+            if (p.appliesTo(engine))
+            {
+                processor = p;
+                break;
+            }
+        }
+        if (processor==null)
+        {
+            LOG.warn("No application processor {} {} {}", processors, engine.getClass(), connection);
+            throw new IllegalStateException("No ALPN processor for "+engine);
+        }
+        if (LOG.isDebugEnabled())
+            LOG.debug("configure {} {} {}", processor, engine, connection);
+        processor.configure(engine, connection);
+        return connection;
     }
 }

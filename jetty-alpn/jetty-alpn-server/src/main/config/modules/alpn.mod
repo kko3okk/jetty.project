@@ -3,7 +3,7 @@ Enables the ALPN (Application Layer Protocol Negotiation) TLS extension.
 
 [depend]
 ssl
-alpn-impl/alpn-${java.version.platform}
+alpn-impl
 
 [lib]
 lib/jetty-alpn-client-${jetty.version}.jar
