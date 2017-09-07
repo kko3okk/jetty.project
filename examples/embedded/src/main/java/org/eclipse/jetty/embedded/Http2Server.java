@@ -74,7 +74,10 @@ public class Http2Server
         server.addBean(mbContainer);
 
         ServletContextHandler context = new ServletContextHandler(server, "/",ServletContextHandler.SESSIONS);
-        context.setResourceBase("src/main/resources/docroot");
+        String docroot = "src/main/resources/docroot";
+        if (!new File(docroot).exists())
+            docroot = "examples/embedded/src/main/resources/docroot";
+        context.setResourceBase(docroot);
         context.addFilter(PushCacheFilter.class,"/*",EnumSet.of(DispatcherType.REQUEST));
         // context.addFilter(PushSessionCacheFilter.class,"/*",EnumSet.of(DispatcherType.REQUEST));
         context.addFilter(PushedTilesFilter.class,"/*",EnumSet.of(DispatcherType.REQUEST));
