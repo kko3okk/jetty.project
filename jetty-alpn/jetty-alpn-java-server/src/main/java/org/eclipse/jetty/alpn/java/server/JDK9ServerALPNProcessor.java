@@ -29,6 +29,7 @@ import org.eclipse.jetty.io.Connection;
 import org.eclipse.jetty.io.ssl.ALPNProcessor;
 import org.eclipse.jetty.io.ssl.SslConnection;
 import org.eclipse.jetty.io.ssl.SslHandshakeListener;
+import org.eclipse.jetty.util.JavaVersion;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 
@@ -39,9 +40,8 @@ public class JDK9ServerALPNProcessor implements ALPNProcessor.Server, SslHandsha
     @Override
     public void init(boolean debug)
     {
-        String javaVersion = System.getProperty("java.version");
-        if (javaVersion.startsWith("1."))
-            throw new IllegalStateException(this + " not applicable for java "+javaVersion);
+        if (JavaVersion.VERSION.getPlatform()<9)
+            throw new IllegalStateException(this + " not applicable for java "+JavaVersion.VERSION);
         if (debug)
             LOG.setDebugEnabled(true);
     }
@@ -49,6 +49,7 @@ public class JDK9ServerALPNProcessor implements ALPNProcessor.Server, SslHandsha
     @Override
     public boolean appliesTo(SSLEngine sslEngine)
     {
+        // TODO check the class name... make this more future proof!
         return sslEngine.getClass().getName().startsWith("sun.security.ssl.");
     }
 

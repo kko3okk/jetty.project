@@ -28,6 +28,7 @@ import org.eclipse.jetty.alpn.ALPN;
 import org.eclipse.jetty.alpn.server.ALPNServerConnection;
 import org.eclipse.jetty.io.Connection;
 import org.eclipse.jetty.io.ssl.ALPNProcessor;
+import org.eclipse.jetty.util.JavaVersion;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 
@@ -38,9 +39,8 @@ public class OpenJDK8ALPNProcessor implements ALPNProcessor.Server
     @Override
     public void init(boolean debug)
     {
-        String javaVersion = System.getProperty("java.version");
-        if (!javaVersion.startsWith("1."))
-            throw new IllegalStateException(this + " not applicable for java "+javaVersion);
+        if (JavaVersion.VERSION.getPlatform()>8)
+            throw new IllegalStateException(this + " not applicable for java "+JavaVersion.VERSION);
 
         if (ALPN.class.getClassLoader()!=null)
             throw new IllegalStateException(this + " must be on JVM boot classpath");
