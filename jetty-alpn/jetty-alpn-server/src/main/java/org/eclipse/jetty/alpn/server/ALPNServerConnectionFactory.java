@@ -20,6 +20,7 @@ package org.eclipse.jetty.alpn.server;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.ServiceLoader;
 
@@ -55,8 +56,20 @@ public class ALPNServerConnectionFactory extends NegotiatingServerConnectionFact
     {
         super("alpn", protocols);
         MultiException me = new MultiException();
-        for (ALPNProcessor.Server processor: ServiceLoader.load(ALPNProcessor.Server.class))
+        for (Iterator<ALPNProcessor.Server> i = ServiceLoader.load(ALPNProcessor.Server.class).iterator(); i.hasNext();)
         {
+            ALPNProcessor.Server processor;
+            try
+            {
+                processor = i.next();
+            }
+            catch(Throwable th)
+            {
+                LOG.debug("{}",th.toString());
+                me.add(th);
+                continue;
+            }
+
             try
             {
                 processor.init(debug);
@@ -64,7 +77,7 @@ public class ALPNServerConnectionFactory extends NegotiatingServerConnectionFact
             }
             catch(Throwable th)
             {
-                LOG.debug("{} -> {}",processor,th);
+                LOG.debug("{} -> {}",processor,th.toString());
                 me.add(th);
             }
         }
