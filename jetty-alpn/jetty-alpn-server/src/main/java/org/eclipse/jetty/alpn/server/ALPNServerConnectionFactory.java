@@ -44,7 +44,12 @@ public class ALPNServerConnectionFactory extends NegotiatingServerConnectionFact
 
     public ALPNServerConnectionFactory(String protocols)
     {
-        this(protocols.trim().split(",", 0));
+        this(false, protocols);
+    }
+
+    public ALPNServerConnectionFactory(@Name("debug") boolean debug, @Name("protocols") String protocols)
+    {
+        this(debug, protocols.trim().split(",", 0));
     }
     
     public ALPNServerConnectionFactory(@Name("protocols") String... protocols)
@@ -111,11 +116,11 @@ public class ALPNServerConnectionFactory extends NegotiatingServerConnectionFact
         }
         if (processor==null)
         {
-            LOG.warn("No application processor {} {} {}", processors, engine.getClass(), connection);
+            LOG.warn("No application processor {} {} {}", processors, engine.getClass(), connection.getEndPoint());
             throw new IllegalStateException("No ALPN processor for "+engine);
         }
         if (LOG.isDebugEnabled())
-            LOG.debug("configure {} {} {}", processor, engine, connection);
+            LOG.debug("configure {} {} {}", processor, engine, connection.getEndPoint());
         processor.configure(engine, connection);
         return connection;
     }

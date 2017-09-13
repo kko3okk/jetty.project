@@ -15,8 +15,8 @@
   <Call name="addConnectionFactory">
     <Arg>
       <New id="alpn" class="org.eclipse.jetty.alpn.server.ALPNServerConnectionFactory">
-        <Arg type="String"><Property name="jetty.alpn.protocols" deprecated="alpn.protocols" default="" /></Arg>   
         <Arg name="debug" type="boolean"><Property name="jetty.alpn.debug" default="false" /></Arg>
+        <Arg name="protocols" type="String"><Property name="jetty.alpn.protocols" deprecated="alpn.protocols" default="" /></Arg>   
         <Set name="defaultProtocol"><Property name="jetty.alpn.defaultProtocol" deprecated="alpn.defaultProtocol" /></Set>  
       </New>
     </Arg>

@@ -66,7 +66,7 @@ public class ALPNServerConnection extends NegotiatingServerConnection
                 if (factory instanceof CipherDiscriminator && !((CipherDiscriminator)factory).isAcceptable(serverProtocol, tlsProtocol, tlsCipher))
                 {
                     if (LOG.isDebugEnabled())
-                        LOG.debug("{} protocol {} not acceptable to {} for {}/{}", this, serverProtocol, factory, tlsProtocol, tlsCipher);
+                        LOG.debug("Protocol {} not acceptable to {} for {}/{} on {}", serverProtocol, factory, tlsProtocol, tlsCipher, getEndPoint());
                     continue;
                 }
 
@@ -83,12 +83,12 @@ public class ALPNServerConnection extends NegotiatingServerConnection
             else
             {
                 if (LOG.isDebugEnabled())
-                    LOG.debug("{} could not negotiate protocol from client{} and server{}", this, clientProtocols, serverProtocols);
+                    LOG.debug("Could not negotiate protocol from client{} and server{} on {}", clientProtocols, serverProtocols, getEndPoint());
                 throw new IllegalStateException();
             }
         }
         if (LOG.isDebugEnabled())
-            LOG.debug("{} protocol selected {} from client{} and server{}", this, negotiated, clientProtocols, serverProtocols);
+            LOG.debug("Protocol selected {} from client{} and server{} on {}", negotiated, clientProtocols, serverProtocols, getEndPoint());
         setProtocol(negotiated);
     }
 }
