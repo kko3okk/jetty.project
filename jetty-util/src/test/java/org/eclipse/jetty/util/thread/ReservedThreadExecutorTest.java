@@ -127,17 +127,83 @@ public class ReservedThreadExecutorTest
         waitForAllAvailable();
     }
 
-    protected void waitForAllAvailable() throws InterruptedException
+
+    @Test
+    public void testShrink() throws Exception
+    {
+        final long IDLE = 1000;
+
+        _reservedExecutor.stop();
+        _reservedExecutor.setIdleTimeout(IDLE,TimeUnit.MILLISECONDS);
+        _reservedExecutor.start();
+
+        // Reserved threads are lazily started.
+        assertThat(_executor._queue.size(), is(0));
+
+        assertThat(_reservedExecutor.tryExecute(NOOP),is(false));
+        _executor.execute();
+        waitForNoPending();
+
+        CountDownLatch latch = new CountDownLatch(1);
+        Runnable waitForLatch = ()->{try {latch.await();} catch(Exception e){}};
+        assertThat(_reservedExecutor.tryExecute(waitForLatch),is(true));
+        _executor.execute();
+
+        assertThat(_reservedExecutor.tryExecute(NOOP),is(false));
+        _executor.execute();
+        waitForNoPending();
+
+        latch.countDown();
+        waitForAvailable(2);
+
+        // Check that regular activity keeps the pool size
+        TimeUnit.MILLISECONDS.sleep(IDLE/2);
+        assertThat(_reservedExecutor.tryExecute(NOOP),is(true));
+        waitForAvailable(2);
+        TimeUnit.MILLISECONDS.sleep(IDLE/2);
+        assertThat(_reservedExecutor.tryExecute(NOOP),is(true));
+        waitForAvailable(2);
+        TimeUnit.MILLISECONDS.sleep(IDLE/2);
+        assertThat(_reservedExecutor.tryExecute(NOOP),is(true));
+        waitForAvailable(2);
+
+        // check that an idle period reduces size by 1
+        TimeUnit.MILLISECONDS.sleep(IDLE + IDLE/2);
+        assertThat(_reservedExecutor.getAvailable(),is(1));
+        TimeUnit.MILLISECONDS.sleep(IDLE);
+        assertThat(_reservedExecutor.getAvailable(),is(0));
+
+    }
+
+    protected void waitForNoPending() throws InterruptedException
     {
         long started = System.nanoTime();
-        while (_reservedExecutor.getAvailable() < SIZE)
+        while (_reservedExecutor.getPending() > 0)
+        {
+            long elapsed = System.nanoTime() - started;
+            if (elapsed > TimeUnit.SECONDS.toNanos(10))
+                Assert.fail("pending="+_reservedExecutor.getPending());
+            Thread.sleep(10);
+        }
+        assertThat(_reservedExecutor.getPending(), is(0));
+    }
+
+    protected void waitForAvailable(int size) throws InterruptedException
+    {
+        long started = System.nanoTime();
+        while (_reservedExecutor.getAvailable() < size)
         {
             long elapsed = System.nanoTime() - started;
             if (elapsed > TimeUnit.SECONDS.toNanos(10))
                 Assert.fail();
             Thread.sleep(10);
         }
-        assertThat(_reservedExecutor.getAvailable(), is(SIZE));
+        assertThat(_reservedExecutor.getAvailable(), is(size));
+    }
+
+    protected void waitForAllAvailable() throws InterruptedException
+    {
+        waitForAvailable(SIZE);
     }
 
     private static class TestExecutor implements Executor

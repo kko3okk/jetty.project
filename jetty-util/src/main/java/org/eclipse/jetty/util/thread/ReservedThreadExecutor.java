@@ -20,6 +20,7 @@ package org.eclipse.jetty.util.thread;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 
 import org.eclipse.jetty.util.annotation.ManagedAttribute;
@@ -32,19 +33,27 @@ import org.eclipse.jetty.util.log.Logger;
  * An Executor using preallocated/reserved Threads from a wrapped Executor.
  * <p>Calls to {@link #execute(Runnable)} on a {@link ReservedThreadExecutor} will either succeed
  * with a Thread immediately being assigned the Runnable task, or fail if no Thread is
- * available. Threads are preallocated up to the capacity from a wrapped {@link Executor}.
+ * available.
+ * <p>Threads are reserved lazily, with a new reserved thread being allocated from a
+ * wrapped {@link Executor} when an execution fails.  If the {@link #setIdleTimeout(long, TimeUnit)}
+ * is set to non zero (default 1 minute), then the reserved thread pool will shrink by 1 thread
+ * whenever it has been idle for that period.
  */
 @ManagedObject("A pool for reserved threads")
 public class ReservedThreadExecutor extends AbstractLifeCycle implements Executor
 {
     private static final Logger LOG = Log.getLogger(ReservedThreadExecutor.class);
 
+    private static final Runnable SHRINK = ()->{};
     private final Executor _executor;
     private final Locker _locker = new Locker();
     private final ReservedThread[] _queue;
     private int _head;
     private int _size;
     private int _pending;
+    private long _idleTime = 1L;
+    private TimeUnit _idleTimeUnit = TimeUnit.MINUTES;
+    private long _notIdleNanos = System.nanoTime();
 
     public ReservedThreadExecutor(Executor executor)
     {
@@ -107,6 +116,19 @@ public class ReservedThreadExecutor extends AbstractLifeCycle implements Executo
         }
     }
 
+    /**
+     * Set the idle timeout for shrinking the reserved thread pool
+     * @param idleTime Time to wait before shrinking
+     * @param idleTimeUnit Time units for idle timeout
+     */
+    public void setIdleTimeout(long idleTime, TimeUnit idleTimeUnit)
+    {
+        if (isRunning())
+            throw new IllegalStateException();
+        _idleTime = idleTime;
+        _idleTimeUnit = idleTimeUnit;
+    }
+
     @Override
     public void doStop() throws Exception
     {
@@ -139,8 +161,10 @@ public class ReservedThreadExecutor extends AbstractLifeCycle implements Executo
         if (task==null)
             return false;
 
-        try (Locker.Lock lock = _locker.lock())
+        try (Locker.Lock lock = _locker.lockIfNotHeld())
         {
+            _notIdleNanos = System.nanoTime();
+
             if (_size==0)
             {
                 if (_pending<_queue.length)
@@ -183,6 +207,7 @@ public class ReservedThreadExecutor extends AbstractLifeCycle implements Executo
         }
     }
 
+
     private class ReservedThread implements Runnable
     {
         private Condition _wakeup = null;
@@ -190,6 +215,19 @@ public class ReservedThreadExecutor extends AbstractLifeCycle implements Executo
 
         private void reservedWait() throws InterruptedException
         {
+            if (_idleTime>0)
+            {
+                while (true)
+                {
+                    if (_wakeup.await(_idleTime, _idleTimeUnit))
+                        return;
+                    long now = System.nanoTime();
+                    long period = now - _notIdleNanos;
+                    if (period > _idleTimeUnit.toNanos(_idleTime))
+                        execute(SHRINK);
+                }
+            }
+
             _wakeup.await();
         }
 
@@ -235,7 +273,11 @@ public class ReservedThreadExecutor extends AbstractLifeCycle implements Executo
                     }
                 }
 
-                // Run any task 
+                // Handle shrink poison pill
+                if (task==SHRINK)
+                    return;
+
+                // Run any task
                 if (task!=null)
                 {
                     try
