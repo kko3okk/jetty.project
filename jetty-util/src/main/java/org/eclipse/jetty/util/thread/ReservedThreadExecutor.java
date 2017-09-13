@@ -44,16 +44,13 @@ public class ReservedThreadExecutor extends AbstractLifeCycle implements Executo
 {
     private static final Logger LOG = Log.getLogger(ReservedThreadExecutor.class);
 
-    private static final Runnable SHRINK = ()->{};
     private final Executor _executor;
     private final Locker _locker = new Locker();
-    private final ReservedThread[] _queue;
-    private int _head;
+    private final ReservedThread[] _stack;
     private int _size;
     private int _pending;
     private long _idleTime = 1L;
     private TimeUnit _idleTimeUnit = TimeUnit.MINUTES;
-    private long _notIdleNanos = System.nanoTime();
 
     public ReservedThreadExecutor(Executor executor)
     {
@@ -84,7 +81,7 @@ public class ReservedThreadExecutor extends AbstractLifeCycle implements Executo
             }
         }
 
-        _queue = new ReservedThread[capacity];
+        _stack = new ReservedThread[capacity];
     }
 
     public Executor getExecutor()
@@ -95,7 +92,7 @@ public class ReservedThreadExecutor extends AbstractLifeCycle implements Executo
     @ManagedAttribute(value = "max number of reserved threads", readonly = true)
     public int getCapacity()
     {
-        return _queue.length;
+        return _stack.length;
     }
 
     @ManagedAttribute(value = "available reserved threads", readonly = true)
@@ -136,10 +133,8 @@ public class ReservedThreadExecutor extends AbstractLifeCycle implements Executo
         {
             while (_size>0)
             {
-                ReservedThread thread = _queue[_head];
-                _queue[_head] = null;
-                _head = (_head+1)%_queue.length;
-                _size--;
+                ReservedThread thread = _stack[--_size];
+                _stack[_size] = null;
                 thread._wakeup.signal();
             }
         }
@@ -163,11 +158,9 @@ public class ReservedThreadExecutor extends AbstractLifeCycle implements Executo
 
         try (Locker.Lock lock = _locker.lockIfNotHeld())
         {
-            _notIdleNanos = System.nanoTime();
-
             if (_size==0)
             {
-                if (_pending<_queue.length)
+                if (_pending<_stack.length)
                 {
                     _executor.execute(new ReservedThread());
                     _pending++;
@@ -175,12 +168,10 @@ public class ReservedThreadExecutor extends AbstractLifeCycle implements Executo
                 return false;
             }
 
-            ReservedThread thread = _queue[_head];
-            _queue[_head] = null;
-            _head = (_head+1)%_queue.length;
-            _size--;
+            ReservedThread thread = _stack[--_size];
+            _stack[_size] = null;
 
-            if (_size==0 && _pending<_queue.length)
+            if (_size==0 && _pending<_stack.length)
             {
                 _executor.execute(new ReservedThread());
                 _pending++;
@@ -207,28 +198,39 @@ public class ReservedThreadExecutor extends AbstractLifeCycle implements Executo
         }
     }
 
-
     private class ReservedThread implements Runnable
     {
         private Condition _wakeup = null;
         private Runnable _task = null;
 
-        private void reservedWait() throws InterruptedException
+        private Runnable reservedWait()
         {
-            if (_idleTime>0)
+            while (_task==null)
             {
-                while (true)
+                if (!isRunning())
+                    return null;
+                try
                 {
-                    if (_wakeup.await(_idleTime, _idleTimeUnit))
-                        return;
-                    long now = System.nanoTime();
-                    long period = now - _notIdleNanos;
-                    if (period > _idleTimeUnit.toNanos(_idleTime))
-                        execute(SHRINK);
+                    if (_idleTime==0)
+                        _wakeup.await();
+                    else
+                    {
+                        if (!_wakeup.await(_idleTime, _idleTimeUnit))
+                        {
+                            // We are idle, so we are no longer needed
+                            return null;
+                        }
+                    }
+                }
+                catch(InterruptedException e)
+                {
+                    LOG.ignore(e);
                 }
             }
 
-            _wakeup.await();
+            Runnable task = _task;
+            _task = null;
+            return task;
         }
 
         @Override
@@ -247,37 +249,36 @@ public class ReservedThreadExecutor extends AbstractLifeCycle implements Executo
                     }
 
                     // Exit if no longer running or there now too many preallocated threads
-                    if (!isRunning() || _size>=_queue.length)
+                    if (!isRunning() || _size>=_stack.length)
                         break;
 
-                    // Insert ourselves in the queue
-                    _queue[(_head+_size++)%_queue.length] = this;
+                    // Insert ourselves in the stack
+                    _stack[_size++] = this;
 
-                    // Wait for a task, ignoring spurious wakeups
-                    while (isRunning() && task==null)
+                    // Wait for a task
+                    if (LOG.isDebugEnabled())
+                        LOG.debug("{} waiting", this);
+                    task = reservedWait();
+                    if (LOG.isDebugEnabled())
+                        LOG.debug("{} woken up {}", this, task);
+
+                    // If no task, we are not needed anymore
+                    if (task==null && isRunning())
                     {
-                        try
+                        for (int i=0; i<_size; i++)
                         {
-                            if (LOG.isDebugEnabled())
-                                LOG.debug("{} waiting", this);
-                            reservedWait();
-                            if (LOG.isDebugEnabled())
-                                LOG.debug("{} woken up", this);
-                            task = _task;
-                            _task = null;
+                            if (_stack[i]==this)
+                            {
+                                if (LOG.isDebugEnabled())
+                                    LOG.debug("{} shrink {}", this, i);
+                                System.arraycopy(_stack, i + 1, _stack, i, --_size);
+                                return;
+                            }
                         }
-                        catch (InterruptedException e)
-                        {
-                            LOG.ignore(e);
-                        }
+                        throw new IllegalStateException();
                     }
                 }
 
-                // Handle shrink poison pill
-                if (task==SHRINK)
-                    return;
-
-                // Run any task
                 if (task!=null)
                 {
                     try

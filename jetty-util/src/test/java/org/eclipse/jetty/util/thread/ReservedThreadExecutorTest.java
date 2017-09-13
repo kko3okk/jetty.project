@@ -156,20 +156,18 @@ public class ReservedThreadExecutorTest
         latch.countDown();
         waitForAvailable(2);
 
-        // Check that regular activity keeps the pool size
+        // Check that regular moderate activity keeps the pool a moderate size
         TimeUnit.MILLISECONDS.sleep(IDLE/2);
         assertThat(_reservedExecutor.tryExecute(NOOP),is(true));
         waitForAvailable(2);
         TimeUnit.MILLISECONDS.sleep(IDLE/2);
         assertThat(_reservedExecutor.tryExecute(NOOP),is(true));
-        waitForAvailable(2);
+        waitForAvailable(1);
         TimeUnit.MILLISECONDS.sleep(IDLE/2);
         assertThat(_reservedExecutor.tryExecute(NOOP),is(true));
-        waitForAvailable(2);
+        waitForAvailable(1);
 
-        // check that an idle period reduces size by 1
-        TimeUnit.MILLISECONDS.sleep(IDLE + IDLE/2);
-        assertThat(_reservedExecutor.getAvailable(),is(1));
+        // check fully idle goes to zero
         TimeUnit.MILLISECONDS.sleep(IDLE);
         assertThat(_reservedExecutor.getAvailable(),is(0));
 
