@@ -16,29 +16,39 @@
 //  ========================================================================
 //
 
-package org.eclipse.jetty.alpn.java.client;
+package org.eclipse.jetty.alpn.conscrypt.client;
 
+import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.security.Security;
 import java.util.List;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLParameters;
 
+import org.conscrypt.OpenSSLProvider;
 import org.eclipse.jetty.alpn.client.ALPNClientConnection;
 import org.eclipse.jetty.io.Connection;
 import org.eclipse.jetty.io.ssl.ALPNProcessor;
-import org.eclipse.jetty.io.ssl.SslConnection.DecryptedEndPoint;
+import org.eclipse.jetty.io.ssl.SslConnection;
 import org.eclipse.jetty.io.ssl.SslHandshakeListener;
 import org.eclipse.jetty.util.JavaVersion;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 
-public class JDK9ClientALPNProcessor implements ALPNProcessor.Client
+public class ConscryptClientALPNProcessor implements ALPNProcessor.Client
 {
-    private static final Logger LOG = Log.getLogger(JDK9ClientALPNProcessor.class);
+    private static final Logger LOG = Log.getLogger(ConscryptClientALPNProcessor.class);
 
     @Override
     public void init(boolean debug)
     {
+        if (Security.getProvider("Conscrypt") == null)
+        {
+            LOG.debug("Security.addProvider(\"Conscrypt\")");
+            Security.addProvider(new OpenSSLProvider());
+        }
+
         if (JavaVersion.VERSION.getPlatform() < 9)
             throw new IllegalStateException(this + " not applicable for java "+JavaVersion.VERSION);
         if (debug)
@@ -48,23 +58,30 @@ public class JDK9ClientALPNProcessor implements ALPNProcessor.Client
     @Override
     public boolean appliesTo(SSLEngine sslEngine)
     {
-        // TODO check the class name... make this more future proof!
-        return sslEngine.getClass().getName().startsWith("sun.security.ssl.");
+        return sslEngine.getClass().getName().startsWith("org.conscrypt.");
     }
 
     @Override
     public void configure(SSLEngine sslEngine, Connection connection)
     {
-        ALPNClientConnection alpn = (ALPNClientConnection)connection;
-        SSLParameters sslParameters = sslEngine.getSSLParameters();
-        List<String> protocols = alpn.getProtocols();
-        sslParameters.setApplicationProtocols(protocols.toArray(new String[protocols.size()]));
-        sslEngine.setSSLParameters(sslParameters);
+        try
+        {
+            ALPNClientConnection alpn = (ALPNClientConnection)connection;
 
-        ((DecryptedEndPoint)connection.getEndPoint()).getSslConnection()
-                .addHandshakeListener(new ALPNListener(alpn));
+            SSLParameters sslParameters = sslEngine.getSSLParameters();
+            Method method = sslParameters.getClass().getMethod("setApplicationProtocols", String[].class);
+            method.setAccessible(true);
+            List<String> protocols = alpn.getProtocols();
+            method.invoke(sslParameters, protocols.toArray(new String[protocols.size()]));
+            sslEngine.setSSLParameters(sslParameters);
+            ((SslConnection.DecryptedEndPoint)connection.getEndPoint()).getSslConnection()
+                    .addHandshakeListener(new ALPNListener(alpn));
+        }
+        catch(Throwable e)
+        {
+            throw new RuntimeException(e);
+        }
     }
-
 
     private final class ALPNListener implements SslHandshakeListener
     {
@@ -78,8 +95,19 @@ public class JDK9ClientALPNProcessor implements ALPNProcessor.Client
         @Override
         public void handshakeSucceeded(Event event)
         {
-            alpnConnection.selected(alpnConnection.getSSLEngine().getApplicationProtocol());
+            String protocol = null;
+            try
+            {
+                SSLEngine sslEngine = alpnConnection.getSSLEngine();
+                Method method = sslEngine.getClass().getMethod("getAlpnSelectedProtocol");
+                protocol = new String((byte[])method.invoke(sslEngine), StandardCharsets.US_ASCII);
+            }
+            catch (Throwable e)
+            {
+                LOG.warn(e);
+            }
+
+            alpnConnection.selected(protocol);
         }
     }
-
 }

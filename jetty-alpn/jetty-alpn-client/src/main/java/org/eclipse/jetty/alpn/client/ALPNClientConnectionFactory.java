@@ -19,6 +19,8 @@
 package org.eclipse.jetty.alpn.client;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -32,16 +34,21 @@ import org.eclipse.jetty.io.Connection;
 import org.eclipse.jetty.io.EndPoint;
 import org.eclipse.jetty.io.NegotiatingClientConnectionFactory;
 import org.eclipse.jetty.io.ssl.ALPNProcessor;
+import org.eclipse.jetty.io.ssl.ALPNProcessor.Client;
 import org.eclipse.jetty.io.ssl.SslClientConnectionFactory;
+import org.eclipse.jetty.io.ssl.SslConnection.DecryptedEndPoint;
 import org.eclipse.jetty.io.ssl.SslHandshakeListener;
-import org.eclipse.jetty.util.component.ContainerLifeCycle;
+import org.eclipse.jetty.util.MultiException;
+import org.eclipse.jetty.util.log.Log;
+import org.eclipse.jetty.util.log.Logger;
 
 public class ALPNClientConnectionFactory extends NegotiatingClientConnectionFactory implements SslHandshakeListener
 {
-    private final SslHandshakeListener alpnListener = new ALPNListener();
+    private static final Logger LOG = Log.getLogger(ALPNClientConnectionFactory.class);
+
     private final Executor executor;
     private final List<String> protocols;
-    private final ALPNProcessor.Client alpnProcessor;
+    private final List<Client> processors = new ArrayList<>();
 
     public ALPNClientConnectionFactory(Executor executor, ClientConnectionFactory connectionFactory, List<String> protocols)
     {
@@ -50,39 +57,78 @@ public class ALPNClientConnectionFactory extends NegotiatingClientConnectionFact
             throw new IllegalArgumentException("ALPN protocol list cannot be empty");
         this.executor = executor;
         this.protocols = protocols;
-        Iterator<ALPNProcessor.Client> processors = ServiceLoader.load(ALPNProcessor.Client.class).iterator();
-        alpnProcessor = processors.hasNext() ? processors.next() : ALPNProcessor.Client.NOOP;
-    }
 
-    public ALPNProcessor.Client getALPNProcessor()
-    {
-        return alpnProcessor;
+        MultiException me = new MultiException();
+        for (Iterator<Client> i = ServiceLoader.load(Client.class).iterator(); i.hasNext();)
+        {
+            ALPNProcessor.Client processor;
+            try
+            {
+                processor = i.next();
+            }
+            catch(Throwable th)
+            {
+                LOG.debug("{}",th.toString());
+                me.add(th);
+                continue;
+            }
+
+            try
+            {
+                processor.init(LOG.isDebugEnabled());
+                processors.add(processor);
+            }
+            catch(Throwable th)
+            {
+                LOG.debug("{} -> {}",processor,th.toString());
+                me.add(th);
+            }
+        }
+
+        if (LOG.isDebugEnabled())
+        {
+            LOG.debug("protocols: {}", Arrays.asList(protocols));
+            LOG.debug("processors: {}",processors);
+        }
+        if (processors.isEmpty())
+        {
+            IllegalStateException ise = new IllegalStateException("No Client ALPNProcessors!");
+            for (Throwable th : me.getThrowables())
+                ise.addSuppressed(th);
+            throw ise;
+        }
     }
 
     @Override
     public Connection newConnection(EndPoint endPoint, Map<String, Object> context) throws IOException
     {
-        SSLEngine sslEngine = (SSLEngine)context.get(SslClientConnectionFactory.SSL_ENGINE_CONTEXT_KEY);
-        getALPNProcessor().configure(sslEngine, protocols);
-        ContainerLifeCycle connector = (ContainerLifeCycle)context.get(ClientConnectionFactory.CONNECTOR_CONTEXT_KEY);
-        // Method addBean() has set semantic, so the listener is added only once.
-        connector.addBean(alpnListener);
+        SSLEngine engine = (SSLEngine)context.get(SslClientConnectionFactory.SSL_ENGINE_CONTEXT_KEY);
+
+        Client c = null;
+        for (Client p: processors)
+        {
+            if (p.appliesTo(engine))
+            {
+                c = p;
+                break;
+            }
+        }
+        if (c==null)
+        {
+            LOG.warn("No application processor {} {} {}", processors, engine.getClass(), endPoint);
+            throw new IllegalStateException("No ALPN processor for "+engine);
+        }
+        if (LOG.isDebugEnabled())
+            LOG.debug("configure {} {} {}", c, engine, endPoint);
+
+        final Client processor = c;
+
         ALPNClientConnection connection = new ALPNClientConnection(endPoint, executor, getClientConnectionFactory(),
-                sslEngine, context, protocols);
+                engine, context, protocols);
+
+        processor.configure(engine, connection);
+
         return customize(connection, context);
     }
 
-    private class ALPNListener implements SslHandshakeListener
-    {
-        @Override
-        public void handshakeSucceeded(Event event)
-        {
-            getALPNProcessor().process(event.getSSLEngine());
-        }
-
-        @Override
-        public void handshakeFailed(Event event, Throwable failure)
-        {
-        }
-    }
 }

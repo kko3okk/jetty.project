@@ -29,6 +29,7 @@ import javax.net.ssl.SSLEngine;
 import org.eclipse.jetty.io.AbstractConnection;
 import org.eclipse.jetty.io.EndPoint;
 import org.eclipse.jetty.io.ssl.ALPNProcessor;
+import org.eclipse.jetty.io.ssl.ALPNProcessor.Server;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.NegotiatingServerConnectionFactory;
 import org.eclipse.jetty.util.MultiException;
@@ -40,7 +41,7 @@ public class ALPNServerConnectionFactory extends NegotiatingServerConnectionFact
 {
     private static final Logger LOG = Log.getLogger(ALPNServerConnectionFactory.class);
 
-    private final List<ALPNProcessor.Server> processors = new ArrayList<>();
+    private final List<Server> processors = new ArrayList<>();
 
     public ALPNServerConnectionFactory(String protocols)
     {
@@ -61,9 +62,9 @@ public class ALPNServerConnectionFactory extends NegotiatingServerConnectionFact
     {
         super("alpn", protocols);
         MultiException me = new MultiException();
-        for (Iterator<ALPNProcessor.Server> i = ServiceLoader.load(ALPNProcessor.Server.class).iterator(); i.hasNext();)
+        for (Iterator<Server> i = ServiceLoader.load(Server.class).iterator(); i.hasNext();)
         {
-            ALPNProcessor.Server processor;
+            Server processor;
             try
             {
                 processor = i.next();
@@ -77,7 +78,7 @@ public class ALPNServerConnectionFactory extends NegotiatingServerConnectionFact
 
             try
             {
-                processor.init(debug);
+                processor.init(debug || LOG.isDebugEnabled());
                 processors.add(processor);
             }
             catch(Throwable th)
@@ -105,8 +106,8 @@ public class ALPNServerConnectionFactory extends NegotiatingServerConnectionFact
     protected AbstractConnection newServerConnection(Connector connector, EndPoint endPoint, SSLEngine engine, List<String> protocols, String defaultProtocol)
     {
         ALPNServerConnection connection = new ALPNServerConnection(connector, endPoint, engine, protocols, defaultProtocol);
-        ALPNProcessor.Server processor = null;
-        for (ALPNProcessor.Server p: processors)
+        Server processor = null;
+        for (Server p: processors)
         {
             if (p.appliesTo(engine))
             {

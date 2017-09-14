@@ -35,9 +35,9 @@ import org.eclipse.jetty.io.ssl.SslConnection.DecryptedEndPoint;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 
-public class ConscryptALPNProcessor implements ALPNProcessor.Server
+public class ConscryptServerALPNProcessor implements ALPNProcessor.Server
 {
-    private static final Logger LOG = Log.getLogger(ConscryptALPNProcessor.class);
+    private static final Logger LOG = Log.getLogger(ConscryptServerALPNProcessor.class);
 
     @Override
     public void init(boolean debug)

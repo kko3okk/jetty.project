@@ -20,59 +20,47 @@ package org.eclipse.jetty.io.ssl;
 
 import java.util.List;
 
+import javax.net.ssl.HandshakeCompletedListener;
 import javax.net.ssl.SSLEngine;
 
 import org.eclipse.jetty.io.Connection;
 
 public interface ALPNProcessor
 {
-    public interface Server
+    /**
+     * Initialize Processor
+     * @param debug True if the underlying ALPN implementation should produce debug output
+     * @throws Exception Throws if this processor is unavailable (eg missing dependencies or wrong JVM)
+     */
+    public default void init(boolean debug) throws Exception
     {
-        public static final ALPNProcessor.Server NOOP = new ALPNProcessor.Server()
-        {
-        };
-
-        /**
-         * Initialize Processor
-         * @param debug True if the underlying ALPN implementation should produce debug output
-         * @throws Exception Throws if this processor is unavailable (eg missing dependencies or wrong JVM)
-         */
-        public default void init(boolean debug) throws Exception
-        {
-        }
-
-        /**
-         * Test if this processor can be applied to a specific SSLEngine
-         * @param sslEngine The SSLEngine to check
-         * @return True if the processor can be applied
-         */
-        public default boolean appliesTo(SSLEngine sslEngine)
-        {
-            return true;
-        }
-
-        /**
-         * Configure the SSLEngine and connection for ALPN
-         * @param sslEngine The SSLEngine to configure
-         * @param connection The connection to configure
-         */
-        public default void configure(SSLEngine sslEngine, Connection connection)
-        {
-        }
     }
 
-    public interface Client
+    /**
+     * Test if this processor can be applied to a specific SSLEngine
+     * @param sslEngine The SSLEngine to check
+     * @return True if the processor can be applied
+     */
+    public default boolean appliesTo(SSLEngine sslEngine)
     {
-        public static final Client NOOP = new Client()
-        {
-        };
-
-        public default void configure(SSLEngine sslEngine, List<String> protocols)
-        {
-        }
-
-        public default void process(SSLEngine sslEngine)
-        {
-        }
+        return true;
     }
+
+    /**
+     * Configure the SSLEngine and connection for ALPN
+     * @param sslEngine The SSLEngine to configure
+     * @param connection The connection to configure
+     */
+    public default void configure(SSLEngine sslEngine, Connection connection)
+    {
+    }
+
+    public interface Server extends ALPNProcessor
+    {
+    }
+
+    public interface Client extends ALPNProcessor
+    {
+    }
+
 }
