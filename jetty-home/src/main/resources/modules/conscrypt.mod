@@ -27,6 +27,6 @@ Conscrypt is distributed under the Apache Licence 2.0
 https://github.com/google/conscrypt/blob/master/LICENSE
 
 [ini]
-conscrypt.version?=1.1.0-SNAPSHOT
+conscrypt.version?=1.0.0.RC10
 jetty.sslContext.provider?=Conscrypt
 
