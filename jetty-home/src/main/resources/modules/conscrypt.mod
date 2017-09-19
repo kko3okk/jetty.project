@@ -11,8 +11,8 @@ ssl
 alpn-impl
 
 [files]
-#maven://org.conscrypt/conscrypt-openjdk-uber/${conscrypt.version}|lib/conscrypt/conscrypt-uber-${conscrypt.version}.jar
-maven://org.conscrypt/conscrypt-openjdk/${conscrypt.version}/jar/linux-x86_64|lib/conscrypt/conscrypt-${conscrypt.version}-linux-x86_64.jar
+maven://org.conscrypt/conscrypt-openjdk-uber/${conscrypt.version}|lib/conscrypt/conscrypt-uber-${conscrypt.version}.jar
+#maven://org.conscrypt/conscrypt-openjdk/${conscrypt.version}/jar/linux-x86_64|lib/conscrypt/conscrypt-${conscrypt.version}-linux-x86_64.jar
 basehome:modules/conscrypt/conscrypt.xml|etc/conscrypt.xml
 
 [xml]

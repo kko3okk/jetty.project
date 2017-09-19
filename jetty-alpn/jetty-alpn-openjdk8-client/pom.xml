@@ -3,37 +3,36 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
-    <parent>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-alpn-parent</artifactId>
-        <version>9.4.7-SNAPSHOT</version>
-    </parent>
+  <parent>
+    <groupId>org.eclipse.jetty</groupId>
+    <artifactId>jetty-alpn-parent</artifactId>
+    <version>9.4.8-SNAPSHOT</version>
+  </parent>
 
-    <modelVersion>4.0.0</modelVersion>
-    <artifactId>jetty-alpn-openjdk8-client</artifactId>
-    <name>Jetty :: ALPN :: OpenJDK8 Client Implementation</name>
+  <modelVersion>4.0.0</modelVersion>
+  <artifactId>jetty-alpn-openjdk8-client</artifactId>
+  <name>Jetty :: ALPN :: OpenJDK8 Client Implementation</name>
 
-    <properties>
-        <bundle-symbolic-name>${project.groupId}.alpn.java.client</bundle-symbolic-name>
-    </properties>
+  <properties>
+    <bundle-symbolic-name>${project.groupId}.alpn.java.client</bundle-symbolic-name>
+  </properties>
 
-    <dependencies>
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-alpn-client</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.jetty.alpn</groupId>
-            <artifactId>alpn-api</artifactId>
-            <version>${alpn.api.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.jetty.http2</groupId>
-            <artifactId>http2-client</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
-
+  <dependencies>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-alpn-client</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty.alpn</groupId>
+      <artifactId>alpn-api</artifactId>
+      <version>${alpn.api.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty.http2</groupId>
+      <artifactId>http2-client</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
 </project>
