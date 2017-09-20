@@ -23,7 +23,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.Security;
 
 import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLParameters;
 
 import org.conscrypt.OpenSSLProvider;
 import org.eclipse.jetty.alpn.client.ALPNClientConnection;
@@ -60,19 +59,21 @@ public class ConscryptClientALPNProcessor implements ALPNProcessor.Client
     {
         try
         {
+            Method setAlpnProtocols = sslEngine.getClass().getDeclaredMethod("setAlpnProtocols", String[].class);
+            setAlpnProtocols.setAccessible(true);
             ALPNClientConnection alpn = (ALPNClientConnection)connection;
-            // TODO: can we just cast to Conscrypt subclass here ?
-            SSLParameters sslParameters = sslEngine.getSSLParameters();
-            Method method = sslParameters.getClass().getMethod("setApplicationProtocols", String[].class);
             String[] protocols = alpn.getProtocols().toArray(new String[0]);
-            method.invoke(sslParameters, (Object)protocols);
-            sslEngine.setSSLParameters(sslParameters);
+            setAlpnProtocols.invoke(sslEngine, (Object)protocols);
             ((SslConnection.DecryptedEndPoint)connection.getEndPoint()).getSslConnection()
                     .addHandshakeListener(new ALPNListener(alpn));
         }
-        catch(Throwable e)
+        catch (RuntimeException x)
         {
-            throw new RuntimeException(e);
+            throw x;
+        }
+        catch (Exception x)
+        {
+            throw new RuntimeException(x);
         }
     }
 
@@ -91,8 +92,8 @@ public class ConscryptClientALPNProcessor implements ALPNProcessor.Client
             try
             {
                 SSLEngine sslEngine = alpnConnection.getSSLEngine();
-                // TODO: can we just cast to Conscrypt subclass here ?
-                Method method = sslEngine.getClass().getMethod("getAlpnSelectedProtocol");
+                Method method = sslEngine.getClass().getDeclaredMethod("getAlpnSelectedProtocol");
+                method.setAccessible(true);
                 String protocol = new String((byte[])method.invoke(sslEngine), StandardCharsets.US_ASCII);
                 alpnConnection.selected(protocol);
             }

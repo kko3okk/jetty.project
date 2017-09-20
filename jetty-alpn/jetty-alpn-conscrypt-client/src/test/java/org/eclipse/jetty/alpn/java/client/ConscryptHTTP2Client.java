@@ -55,7 +55,7 @@ public class ConscryptHTTP2Client
 
         FuturePromise<Session> sessionPromise = new FuturePromise<>();
         client.connect(sslContextFactory, new InetSocketAddress(host, port), new Session.Listener.Adapter(), sessionPromise);
-        Session session = sessionPromise.get(555, TimeUnit.SECONDS);
+        Session session = sessionPromise.get(5, TimeUnit.SECONDS);
 
         HttpFields requestFields = new HttpFields();
         requestFields.put("User-Agent", client.getClass().getName() + "/" + Jetty.VERSION);
