@@ -106,7 +106,7 @@ public class Http2Server
         sslContextFactory.setKeyStorePassword("OBF:1vny1zlo1x8e1vnw1vn61x8g1zlu1vn4");
         sslContextFactory.setKeyManagerPassword("OBF:1u2u1wml1z7s1z7a1wnl1u2g");
         sslContextFactory.setCipherComparator(HTTP2Cipher.COMPARATOR);
-        sslContextFactory.setProvider("Conscrypt");
+        // sslContextFactory.setProvider("Conscrypt");
 
         // HTTPS Configuration
         HttpConfiguration https_config = new HttpConfiguration(http_config);

@@ -49,8 +49,8 @@ public class JDK9ServerALPNProcessor implements ALPNProcessor.Server, SslHandsha
     @Override
     public boolean appliesTo(SSLEngine sslEngine)
     {
-        // TODO check the class name... make this more future proof!
-        return sslEngine.getClass().getName().startsWith("sun.security.ssl.");
+        Module module = sslEngine.getClass().getModule();
+        return module!=null && "java.base".equals(module.getName());
     }
 
     @Override

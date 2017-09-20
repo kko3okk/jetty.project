@@ -39,7 +39,7 @@ public class JDK9ClientALPNProcessor implements ALPNProcessor.Client
     @Override
     public void init(boolean debug)
     {
-        if (JavaVersion.VERSION.getPlatform() < 9)
+        if (JavaVersion.VERSION.getPlatform()<9)
             throw new IllegalStateException(this + " not applicable for java "+JavaVersion.VERSION);
         if (debug)
             LOG.setDebugEnabled(true);
@@ -48,8 +48,8 @@ public class JDK9ClientALPNProcessor implements ALPNProcessor.Client
     @Override
     public boolean appliesTo(SSLEngine sslEngine)
     {
-        // TODO check the class name... make this more future proof!
-        return sslEngine.getClass().getName().startsWith("sun.security.ssl.");
+        Module module = sslEngine.getClass().getModule();
+        return module!=null && "java.base".equals(module.getName());
     }
 
     @Override

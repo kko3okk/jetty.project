@@ -43,14 +43,12 @@ public class ConscryptClientALPNProcessor implements ALPNProcessor.Client
     @Override
     public void init(boolean debug)
     {
-        if (Security.getProvider("Conscrypt") == null)
+        if (Security.getProvider("Conscrypt")==null)
         {
             LOG.debug("Security.addProvider(\"Conscrypt\")");
             Security.addProvider(new OpenSSLProvider());
         }
 
-        if (JavaVersion.VERSION.getPlatform() < 9)
-            throw new IllegalStateException(this + " not applicable for java "+JavaVersion.VERSION);
         if (debug)
             LOG.setDebugEnabled(true);
     }

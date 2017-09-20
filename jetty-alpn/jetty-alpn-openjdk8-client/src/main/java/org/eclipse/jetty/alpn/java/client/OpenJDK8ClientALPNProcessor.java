@@ -37,18 +37,19 @@ public class OpenJDK8ClientALPNProcessor implements ALPNProcessor.Client
     @Override
     public void init(boolean debug)
     {
-        if (JavaVersion.VERSION.getPlatform() >= 9)
+        if (JavaVersion.VERSION.getPlatform()>8)
             throw new IllegalStateException(this + " not applicable for java "+JavaVersion.VERSION);
-        if (debug)
-            LOG.setDebugEnabled(true);
+
         if (ALPN.class.getClassLoader()!=null)
             throw new IllegalStateException(this + " must be on JVM boot classpath");
+
+        if (debug)
+            LOG.setDebugEnabled(true);
     }
 
     @Override
     public boolean appliesTo(SSLEngine sslEngine)
     {
-        // TODO check the class name... make this more future proof!
         return sslEngine.getClass().getName().startsWith("sun.security.ssl.");
     }
 
