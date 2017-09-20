@@ -21,6 +21,3 @@ etc/jetty-alpn.xml
 ## Specifies what protocol to use when negotiation fails.
 # jetty.alpn.defaultProtocol=http/1.1
 
-## ALPN debug logging on System.err
-# jetty.alpn.debug=false
-
