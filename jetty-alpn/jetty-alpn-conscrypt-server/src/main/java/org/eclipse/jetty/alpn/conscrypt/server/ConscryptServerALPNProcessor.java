@@ -20,7 +20,6 @@ package org.eclipse.jetty.alpn.conscrypt.server;
 
 import java.lang.reflect.Method;
 import java.security.Security;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.BiFunction;
 
@@ -30,8 +29,8 @@ import org.conscrypt.OpenSSLProvider;
 import org.eclipse.jetty.alpn.server.ALPNServerConnection;
 import org.eclipse.jetty.io.Connection;
 import org.eclipse.jetty.io.ssl.ALPNProcessor;
-import org.eclipse.jetty.io.ssl.SslHandshakeListener;
 import org.eclipse.jetty.io.ssl.SslConnection.DecryptedEndPoint;
+import org.eclipse.jetty.io.ssl.SslHandshakeListener;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 
@@ -40,16 +39,14 @@ public class ConscryptServerALPNProcessor implements ALPNProcessor.Server
     private static final Logger LOG = Log.getLogger(ConscryptServerALPNProcessor.class);
 
     @Override
-    public void init(boolean debug)
+    public void init()
     {
         if (Security.getProvider("Conscrypt")==null)
         {
-            LOG.debug("Security.addProvider(\"Conscrypt\")");
             Security.addProvider(new OpenSSLProvider());
+            if (LOG.isDebugEnabled())
+                LOG.debug("Added Conscrypt provider");
         }
-        
-        if (debug)
-            LOG.setDebugEnabled(true);
     }
 
     @Override
@@ -63,14 +60,17 @@ public class ConscryptServerALPNProcessor implements ALPNProcessor.Server
     {
         try
         {
-            // For JDK9 this could call directly, but we need the addProvider in the check, so use same processor
+            // Using reflection to call the Conscrypt API with JDK 8 and the JDK API with JDK 9+.
             Method method = sslEngine.getClass().getMethod("setHandshakeApplicationProtocolSelector",BiFunction.class);
-            method.setAccessible(true);
             method.invoke(sslEngine,new ALPNCallback((ALPNServerConnection)connection));
         }
-        catch(Throwable e)
+        catch (RuntimeException x)
         {
-            throw new RuntimeException(e);
+            throw x;
+        }
+        catch (Exception x)
+        {
+            throw new RuntimeException(x);
         }
     }
 
@@ -99,8 +99,9 @@ public class ConscryptServerALPNProcessor implements ALPNProcessor.Server
             if (alpnConnection.getProtocol()==null)
             {
                 LOG.warn("No ALPN callback! {} {}",alpnConnection, event);
-                alpnConnection.select(Collections.emptyList());
+                alpnConnection.unsupported();
             }
+            // TODO: else branch here ?
             if (LOG.isDebugEnabled())
                 LOG.debug("handshakeSucceeded {} {}", alpnConnection, event);
         }

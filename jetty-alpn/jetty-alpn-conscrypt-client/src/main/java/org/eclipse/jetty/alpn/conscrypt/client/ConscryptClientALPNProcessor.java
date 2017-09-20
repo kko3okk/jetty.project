@@ -21,7 +21,6 @@ package org.eclipse.jetty.alpn.conscrypt.client;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.security.Security;
-import java.util.List;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLParameters;
@@ -32,7 +31,6 @@ import org.eclipse.jetty.io.Connection;
 import org.eclipse.jetty.io.ssl.ALPNProcessor;
 import org.eclipse.jetty.io.ssl.SslConnection;
 import org.eclipse.jetty.io.ssl.SslHandshakeListener;
-import org.eclipse.jetty.util.JavaVersion;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 
@@ -41,16 +39,14 @@ public class ConscryptClientALPNProcessor implements ALPNProcessor.Client
     private static final Logger LOG = Log.getLogger(ConscryptClientALPNProcessor.class);
 
     @Override
-    public void init(boolean debug)
+    public void init()
     {
         if (Security.getProvider("Conscrypt")==null)
         {
-            LOG.debug("Security.addProvider(\"Conscrypt\")");
             Security.addProvider(new OpenSSLProvider());
+            if (LOG.isDebugEnabled())
+                LOG.debug("Added Conscrypt provider");
         }
-
-        if (debug)
-            LOG.setDebugEnabled(true);
     }
 
     @Override
@@ -65,12 +61,11 @@ public class ConscryptClientALPNProcessor implements ALPNProcessor.Client
         try
         {
             ALPNClientConnection alpn = (ALPNClientConnection)connection;
-
+            // TODO: can we just cast to Conscrypt subclass here ?
             SSLParameters sslParameters = sslEngine.getSSLParameters();
             Method method = sslParameters.getClass().getMethod("setApplicationProtocols", String[].class);
-            method.setAccessible(true);
-            List<String> protocols = alpn.getProtocols();
-            method.invoke(sslParameters, protocols.toArray(new String[protocols.size()]));
+            String[] protocols = alpn.getProtocols().toArray(new String[0]);
+            method.invoke(sslParameters, (Object)protocols);
             sslEngine.setSSLParameters(sslParameters);
             ((SslConnection.DecryptedEndPoint)connection.getEndPoint()).getSslConnection()
                     .addHandshakeListener(new ALPNListener(alpn));
@@ -93,19 +88,19 @@ public class ConscryptClientALPNProcessor implements ALPNProcessor.Client
         @Override
         public void handshakeSucceeded(Event event)
         {
-            String protocol = null;
             try
             {
                 SSLEngine sslEngine = alpnConnection.getSSLEngine();
+                // TODO: can we just cast to Conscrypt subclass here ?
                 Method method = sslEngine.getClass().getMethod("getAlpnSelectedProtocol");
-                protocol = new String((byte[])method.invoke(sslEngine), StandardCharsets.US_ASCII);
+                String protocol = new String((byte[])method.invoke(sslEngine), StandardCharsets.US_ASCII);
+                alpnConnection.selected(protocol);
             }
             catch (Throwable e)
             {
+                alpnConnection.selected(null);
                 LOG.warn(e);
             }
-
-            alpnConnection.selected(protocol);
         }
     }
 }

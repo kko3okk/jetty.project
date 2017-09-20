@@ -18,9 +18,6 @@
 
 package org.eclipse.jetty.io.ssl;
 
-import java.util.List;
-
-import javax.net.ssl.HandshakeCompletedListener;
 import javax.net.ssl.SSLEngine;
 
 import org.eclipse.jetty.io.Connection;
@@ -28,39 +25,47 @@ import org.eclipse.jetty.io.Connection;
 public interface ALPNProcessor
 {
     /**
-     * Initialize Processor
-     * @param debug True if the underlying ALPN implementation should produce debug output
-     * @throws Exception Throws if this processor is unavailable (eg missing dependencies or wrong JVM)
+     * Initializes this ALPNProcessor
+     *
+     * @throws RuntimeException if this processor is unavailable (e.g. missing dependencies or wrong JVM)
      */
-    public default void init(boolean debug) throws Exception
+    public default void init()
     {
     }
 
     /**
-     * Test if this processor can be applied to a specific SSLEngine
-     * @param sslEngine The SSLEngine to check
-     * @return True if the processor can be applied
+     * Tests if this processor can be applied to the given SSLEngine.
+     *
+     * @param sslEngine the SSLEngine to check
+     * @return true if the processor can be applied to the given SSLEngine
      */
     public default boolean appliesTo(SSLEngine sslEngine)
     {
-        return true;
+        return false;
     }
 
     /**
-     * Configure the SSLEngine and connection for ALPN
-     * @param sslEngine The SSLEngine to configure
-     * @param connection The connection to configure
+     * Configures the given SSLEngine and the given Connection for ALPN.
+     *
+     * @param sslEngine the SSLEngine to configure
+     * @param connection the Connection to configure
+     * @throws RuntimeException if this processor cannot be configured
      */
     public default void configure(SSLEngine sslEngine, Connection connection)
     {
     }
 
+    /**
+     * Server-side interface used by ServiceLoader.
+     */
     public interface Server extends ALPNProcessor
     {
     }
 
+    /**
+     * Client-side interface used by ServiceLoader.
+     */
     public interface Client extends ALPNProcessor
     {
     }
-
 }

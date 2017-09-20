@@ -19,9 +19,11 @@
 package org.eclipse.jetty.alpn.java.client;
 
 import java.net.InetSocketAddress;
+import java.security.Security;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import org.conscrypt.OpenSSLProvider;
 import org.eclipse.jetty.http.HttpFields;
 import org.eclipse.jetty.http.HttpURI;
 import org.eclipse.jetty.http.HttpVersion;
@@ -37,17 +39,19 @@ import org.eclipse.jetty.util.Jetty;
 import org.eclipse.jetty.util.Promise;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 
-public class JDK9HTTP2Client
+public class ConscryptHTTP2Client
 {
     public static void main(String[] args) throws Exception
     {
+        Security.addProvider(new OpenSSLProvider());
+        SslContextFactory sslContextFactory = new SslContextFactory();
+        sslContextFactory.setProvider("Conscrypt");
         HTTP2Client client = new HTTP2Client();
-        SslContextFactory sslContextFactory = new SslContextFactory(true);
         client.addBean(sslContextFactory);
         client.start();
 
-        String host = "localhost";
-        int port = 8443;
+        String host = "webtide.com";
+        int port = 443;
 
         FuturePromise<Session> sessionPromise = new FuturePromise<>();
         client.connect(sslContextFactory, new InetSocketAddress(host, port), new Session.Listener.Adapter(), sessionPromise);

@@ -37,19 +37,14 @@ public class OpenJDK8ServerALPNProcessor implements ALPNProcessor.Server
     private static final Logger LOG = Log.getLogger(OpenJDK8ServerALPNProcessor.class);
     
     @Override
-    public void init(boolean debug)
+    public void init()
     {
-        if (JavaVersion.VERSION.getPlatform()>8)
+        if (JavaVersion.VERSION.getPlatform()!=8)
             throw new IllegalStateException(this + " not applicable for java "+JavaVersion.VERSION);
-
         if (ALPN.class.getClassLoader()!=null)
             throw new IllegalStateException(this + " must be on JVM boot classpath");
-        
-        if (debug)
-        {
-            LOG.setDebugEnabled(true);
+        if (LOG.isDebugEnabled())
             ALPN.debug = true;
-        }
     }
 
     @Override
@@ -106,5 +101,4 @@ public class OpenJDK8ServerALPNProcessor implements ALPNProcessor.Server
             return alpnConnection.getProtocol();
         }
     }
-
 }

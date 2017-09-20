@@ -18,7 +18,6 @@
 
 package org.eclipse.jetty.alpn.java.server;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.function.BiFunction;
 
@@ -38,12 +37,10 @@ public class JDK9ServerALPNProcessor implements ALPNProcessor.Server, SslHandsha
     private static final Logger LOG = Log.getLogger(JDK9ServerALPNProcessor.class);
 
     @Override
-    public void init(boolean debug)
+    public void init()
     {
         if (JavaVersion.VERSION.getPlatform()<9)
             throw new IllegalStateException(this + " not applicable for java "+JavaVersion.VERSION);
-        if (debug)
-            LOG.setDebugEnabled(true);
     }
 
     @Override
@@ -84,8 +81,9 @@ public class JDK9ServerALPNProcessor implements ALPNProcessor.Server, SslHandsha
             if (alpnConnection.getProtocol()==null)
             {
                 LOG.warn("No ALPN callback! {} {}",alpnConnection, event);
-                alpnConnection.select(Collections.emptyList());
+                alpnConnection.unsupported();
             }
+            // TODO: else branch here ?
             if (LOG.isDebugEnabled())
                 LOG.debug("handshakeSucceeded {} {}", alpnConnection, event);
         }

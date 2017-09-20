@@ -37,12 +37,10 @@ public class JDK9ClientALPNProcessor implements ALPNProcessor.Client
     private static final Logger LOG = Log.getLogger(JDK9ClientALPNProcessor.class);
 
     @Override
-    public void init(boolean debug)
+    public void init()
     {
         if (JavaVersion.VERSION.getPlatform()<9)
             throw new IllegalStateException(this + " not applicable for java "+JavaVersion.VERSION);
-        if (debug)
-            LOG.setDebugEnabled(true);
     }
 
     @Override
@@ -60,11 +58,9 @@ public class JDK9ClientALPNProcessor implements ALPNProcessor.Client
         List<String> protocols = alpn.getProtocols();
         sslParameters.setApplicationProtocols(protocols.toArray(new String[protocols.size()]));
         sslEngine.setSSLParameters(sslParameters);
-
         ((DecryptedEndPoint)connection.getEndPoint()).getSslConnection()
                 .addHandshakeListener(new ALPNListener(alpn));
     }
-
 
     private final class ALPNListener implements SslHandshakeListener
     {
@@ -78,8 +74,10 @@ public class JDK9ClientALPNProcessor implements ALPNProcessor.Client
         @Override
         public void handshakeSucceeded(Event event)
         {
-            alpnConnection.selected(alpnConnection.getSSLEngine().getApplicationProtocol());
+            String protocol = alpnConnection.getSSLEngine().getApplicationProtocol();
+            if (LOG.isDebugEnabled())
+                LOG.debug("selected protocol {}", protocol);
+            alpnConnection.selected(protocol);
         }
     }
-
 }
